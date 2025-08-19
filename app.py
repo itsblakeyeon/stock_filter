@@ -58,13 +58,13 @@ def main():
     st.title("🚗 재고 데이터 통합 처리 시스템")
     st.markdown("---")
 
-    # 처리 설정 (중앙 상단)
-    st.subheader("📋 처리 설정")
+    # 처리 설정 및 사용 방법 (2열 배치)
+    st.subheader("📋 처리 설정 및 사용 방법")
     
-    # 날짜 선택을 컬럼으로 배치
-    col1, col2, col3 = st.columns([1, 2, 1])
+    col1, col2 = st.columns(2)
     
-    with col2:
+    with col1:
+        st.markdown("##### 📅 처리 날짜")
         today = datetime.now()
         selected_date = st.date_input(
             "처리 날짜 선택", value=today, help="데이터 처리에 사용할 날짜를 선택하세요"
@@ -72,20 +72,21 @@ def main():
         date_str = selected_date.strftime("%y%m%d")
         st.info(f"선택된 날짜: {date_str}")
 
-    # 사용 방법 (토글)
-    with st.expander("ℹ️ 사용 방법", expanded=True):
-        st.markdown(
-            """
-            1. **날짜 선택**: 처리할 날짜를 선택하세요 (기본: 오늘)
-            2. **파일 업로드**: 현대와 기아 재고리스트 파일을 업로드하세요
-            3. **처리 시작**: '데이터 처리 시작' 버튼을 클릭하세요
-            4. **결과 다운로드**: 처리가 완료되면 결과 파일을 다운로드하세요
-            
-            **파일 형식**:
-            - 현대: `재고리스트_현대_YYMMDD.xlsx` 파일
-            - 기아: `재고리스트_기아_YYMMDD.xls` 파일
-            """
-        )
+    with col2:
+        # 사용 방법 (토글)
+        with st.expander("ℹ️ 사용 방법", expanded=True):
+            st.markdown(
+                """
+                1. **날짜 선택**: 처리할 날짜를 선택하세요 (기본: 오늘)
+                2. **파일 업로드**: 현대와 기아 재고리스트 파일을 업로드하세요
+                3. **처리 시작**: '데이터 처리 시작' 버튼을 클릭하세요
+                4. **결과 다운로드**: 처리가 완료되면 결과 파일을 다운로드하세요
+                
+                **파일 형식**:
+                - 현대: `재고리스트_현대_YYMMDD.xlsx` 파일
+                - 기아: `재고리스트_기아_YYMMDD.xls` 파일
+                """
+            )
     
     st.markdown("---")
 
