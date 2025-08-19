@@ -201,8 +201,7 @@ def calculate_car_cost(car_price, fuel_type="", subsidy_trim="", company=""):
     subsidy_national, subsidy_lease = match_subsidy(subsidy_trim)
     
     # Pricing 엔진 사용
-    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'pricing'))
-    from core.calculations import calculate_car_cost as pricing_calculate_car_cost
+    from Pricing import calculate_car_cost as pricing_calculate_car_cost
     car_cost_detail, total_cost = pricing_calculate_car_cost(
         car_price=car_price,
         fuel_type=fuel_type,
@@ -227,15 +226,13 @@ def calculate_car_cost(car_price, fuel_type="", subsidy_trim="", company=""):
 
 def get_cost_structure():
     """비용 구조 반환 - Pricing 엔진 사용"""
-    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'pricing'))
-    from core.calculations import get_cost_structure as pricing_get_cost_structure
+    from Pricing.core.calculations import get_cost_structure as pricing_get_cost_structure
     return pricing_get_cost_structure()
 
 
 def calculate_residual_values(car_cost):
     """잔존가치 계산 - Pricing 엔진 사용"""
-    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'pricing'))
-    from core.calculations import calculate_residual_values as pricing_calculate_residual_values
+    from Pricing.core.calculations import calculate_residual_values as pricing_calculate_residual_values
     return pricing_calculate_residual_values(car_cost)
 
 
@@ -254,15 +251,13 @@ def calculate_subscription_fees(car_price, fuel_type="", subsidy_trim="", compan
         terms=[12, 36, 60, 84]
     )
     
-    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'pricing'))
-    from core.calculations import calculate_subscription_fees as pricing_calculate_subscription_fees
+    from Pricing.core.calculations import calculate_subscription_fees as pricing_calculate_subscription_fees
     return pricing_calculate_subscription_fees(subscription_input)
 
 
 def calculate_option_fees(price_options):
     """옵션 프라이싱 계산 함수 - Pricing 엔진 사용"""
-    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'pricing'))
-    from core.calculations import calculate_option_fees as pricing_calculate_option_fees
+    from Pricing.core.calculations import calculate_option_fees as pricing_calculate_option_fees
     return pricing_calculate_option_fees(price_options, [12, 36, 60, 84])
 
 

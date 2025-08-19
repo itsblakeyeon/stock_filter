@@ -224,7 +224,7 @@ def create_upload_file(date_str, listed_df):
     # 선택된 컬럼만 추출
     selected_columns = [
         "code_sales_a",
-        "code_sales_b", 
+        "code_sales_b",
         "code_color_a",
         "code_color_b",
         "request",
