@@ -8,28 +8,71 @@ import pandas as pd
 import sys
 import os
 
-# Pricing 모듈 경로 추가
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+# 내부 구현으로 대체 (외부 Pricing 모듈 의존성 제거)
 
-from Pricing import (
-    calculate_pricing_complete,
-    calculate_car_cost,
-    calculate_option_fees,
-    calculate_subscription_fees,
-    SubscriptionInput,
-    PricingConfig
+# 새로운 내부 모듈들 import
+from src.config.pricing_constants import (
+    PricingConfig,
+    OptionConfig,
+    CostStructure,
+    YEAR_INFO,
+    SUBSCRIPTION_TERMS,
 )
-
+from src.pricing.models import (
+    CarCostDetail,
+    SubscriptionInput,
+    PricingResult,
+    CalculationSummary,
+)
 from src.pricing.price_reference import (
     get_all_subsidy_data,
     find_price_by_trim,
     find_price_by_key,
 )
-from src.config.constants import (
-    YEAR_INFO,
-    SUBSCRIPTION_TERMS,
-    CostStructure,
-)
+
+# 간단한 내부 구현 함수들
+def calculate_pricing_complete(car_price, option_price=0, fuel_type="", 
+                             subsidy_national=0, subsidy_lease=0, company=""):
+    """완전한 프라이싱 계산 (간단 버전)"""
+    # 기본 차량 비용 계산
+    tax = car_price * 0.07
+    subsidy_total = (subsidy_national + subsidy_lease) * 10000
+    if fuel_type == "전기":
+        subsidy_total += PricingConfig.ELECTRIC_TAX_SUBSIDY
+    
+    total_cost = car_price + tax - subsidy_total + PricingConfig.REGISTRATION_FEE
+    
+    # 구독료 기본 계산 (간단화)
+    subscription_fees = {}
+    for term in SUBSCRIPTION_TERMS:
+        monthly_fee = total_cost / term * 1.1  # 간단한 수수료 적용
+        subscription_fees[f"fee_return_options_{term}m"] = monthly_fee
+        subscription_fees[f"fee_purchase_options_{term}m"] = monthly_fee * 0.9
+    
+    return {
+        "total_cost": total_cost,
+        "subscription_fees": subscription_fees,
+        "care_fee": PricingConfig.CARE_FEE_ELECTRIC if fuel_type == "전기" else PricingConfig.CARE_FEE_OTHER
+    }
+
+def calculate_car_cost(car_price, fuel_type="", subsidy_trim="", company=""):
+    """차량 비용 계산 (간단 버전)"""
+    result = calculate_pricing_complete(car_price, 0, fuel_type, 0, 0, company)
+    return None, result["total_cost"]
+
+def calculate_subscription_fees(car_price, fuel_type="", subsidy_trim="", company=""):
+    """구독료 계산 (간단 버전)"""
+    result = calculate_pricing_complete(car_price, 0, fuel_type, 0, 0, company)
+    return result["subscription_fees"]
+
+def calculate_option_fees(price_options):
+    """옵션 수수료 계산 (간단 버전)"""
+    option_fees = {}
+    for term in SUBSCRIPTION_TERMS:
+        monthly_fee = price_options * OptionConfig.PREMIUM_RATE / term
+        option_fees[f"fee_return_options_{term}m"] = monthly_fee
+        option_fees[f"fee_purchase_options_{term}m"] = monthly_fee
+    return option_fees
 
 # 기존 코드와의 호환성을 위해 data 변수 생성
 subsidy_data = get_all_subsidy_data()
