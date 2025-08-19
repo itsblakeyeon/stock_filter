@@ -33,35 +33,41 @@ def main(cleaned_df=None):
     result_df["stock"] = pd.to_numeric(result_df["stock"], errors='coerce')
     result_df["stock"] = result_df["stock"].fillna(0).astype(int)
     
-    # 기본 필터링: 재고 3 이상
+    # 기본 필터링: 재고 5 이상
     from src.config.constants import DataProcessing
     filtered_df = result_df[result_df["stock"] >= DataProcessing.STOCK_THRESHOLD].copy()
     
     # 추가 필터링 조건 적용
-    # 1) 기본 휠&타이어만
+    # 1) 가격 정보 있는 차량만 (price_car_tax_pre, price_car_tax_post, price_options가 ?가 아닌 것)
+    def has_valid_price_info(row):
+        price_pre = str(row.get("price_car_tax_pre", "?")).strip()
+        price_post = str(row.get("price_car_tax_post", "?")).strip()
+        price_options = str(row.get("price_options", "?")).strip()
+        
+        return (price_pre != "?" and price_pre != "" and pd.notna(row.get("price_car_tax_pre")) and
+                price_post != "?" and price_post != "" and pd.notna(row.get("price_car_tax_post")) and
+                price_options != "?" and price_options != "" and pd.notna(row.get("price_options")))
+    
+    filtered_df = filtered_df[filtered_df.apply(has_valid_price_info, axis=1)].copy()
+    
+    # 2) 기본 휠&타이어만
     filtered_df = filtered_df[filtered_df["wheel_tire"] == "기본 휠&타이어"].copy()
     
-    # 2) 기아차 특정 모델 제외 (봉고, K5, 니로, K8, K9)
-    filtered_df = filtered_df[
-        ~((filtered_df["company"] == "기아") & 
-          (filtered_df["model"].isin(["봉고", "K5", "니로", "K8", "K9"])))
-    ].copy()
-    
-    # 3) 빌트인캠만 포함 또는 무옵션 차량 필터링
-    def filter_builtin_cam_or_no_options(df):
-        def has_only_builtin_cam_or_no_options(option_str):
+    # 3) 빌트인캠만 포함하는 차량 필터링 (무옵션 제외)
+    def filter_builtin_cam_only(df):
+        def has_only_builtin_cam(option_str):
             if pd.isna(option_str) or option_str == "":
-                return True  # 무옵션 허용 (빈 값)
+                return False  # 무옵션 제외
             option_str = str(option_str).strip()
             if option_str == "" or option_str == "무옵션":
-                return True  # 빈 문자열이나 "무옵션" 텍스트 처리
+                return False  # 빈 문자열이나 "무옵션" 텍스트 제외
             # 빌트인캠만 있는지 확인 (쉼표로 구분된 옵션들 중 빌트인캠만 있는지)
             options = [opt.strip() for opt in option_str.split(',') if opt.strip()]
             return len(options) == 1 and "빌트인캠" in options[0]
         
-        return df[df["options"].apply(has_only_builtin_cam_or_no_options)]
+        return df[df["options"].apply(has_only_builtin_cam)]
     
-    filtered_df = filter_builtin_cam_or_no_options(filtered_df)
+    filtered_df = filter_builtin_cam_only(filtered_df)
     
     # 5. 24, 48, 72개월 가격 컬럼 제거
     columns_to_remove = [
@@ -71,19 +77,18 @@ def main(cleaned_df=None):
     filtered_df = filtered_df.drop(columns=[col for col in columns_to_remove if col in filtered_df.columns])
     
     
-    # 7. 결과 저장
-    filtered_df.to_excel("data/export/stock_unified.xlsx", index=False)
-    
-    # 8. 회사별 통계 출력
+    # 7. 회사별 통계 출력
     print(f"\n📊 회사별 통계:")
     company_stats = filtered_df["company"].value_counts()
     for company, count in company_stats.items():
         print(f"  {company}: {count}대")
     
     print(f"\n✅ 완료! {len(filtered_df)}대 차량")
-    print(f"📊 필터링 조건: 재고 {DataProcessing.STOCK_THRESHOLD} 이상 + 기본 휠&타이어 + (빌트인캠만 또는 무옵션) (기아 봉고/K5/니로/K8/K9 제외)")
+    print(f"📊 필터링 조건: 재고 {DataProcessing.STOCK_THRESHOLD} 이상 + 가격정보 있음 + 기본 휠&타이어 + 빌트인캠만")
     print(f"📊 구독료 컬럼: {len(filtered_df.columns)-18}개")
-    print(f"📁 결과 파일: data/export/stock_unified.xlsx")
+    
+    # 8. 필터링된 데이터 반환
+    return filtered_df
 
 
 if __name__ == "__main__":

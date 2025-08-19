@@ -3,22 +3,86 @@
 통합 상수 모듈
 프로젝트 전체에서 사용되는 상수들을 중앙 관리
 """
+from datetime import datetime
+
+# 전역 날짜 설정 (기본값: None = 오늘 날짜 사용)
+_GLOBAL_DATE = None
+
+def set_global_date(date_str):
+    """전역 날짜를 설정 (YYMMDD 형식)"""
+    global _GLOBAL_DATE
+    _GLOBAL_DATE = date_str
+
+def get_today_date_string():
+    """설정된 날짜 또는 오늘 날짜를 YYMMDD 형식으로 반환"""
+    if _GLOBAL_DATE:
+        return _GLOBAL_DATE
+    return datetime.now().strftime("%y%m%d")
+
+def get_raw_file_path(company, date_str=None):
+    """날짜가 포함된 raw 파일 경로를 생성"""
+    if date_str is None:
+        date_str = get_today_date_string()
+    
+    if company.lower() == "hyundai":
+        return f"data/raw/재고리스트_현대_{date_str}.xlsx"
+    elif company.lower() == "kia":
+        return f"data/raw/재고리스트_기아_{date_str}.xls"
+    else:
+        raise ValueError(f"Unknown company: {company}")
 
 # 파일 경로 설정
 class FilePaths:
-    # Raw data files
-    HYUNDAI_RAW_FILE = "data/raw/재고리스트_현대.xlsx"
-    KIA_RAW_FILE = "data/raw/재고리스트_기아.xls"
+    # Raw data files (동적 생성을 위한 함수들)
+    @staticmethod
+    def get_hyundai_raw_file(date_str=None):
+        return get_raw_file_path("hyundai", date_str)
     
-    # Export paths
+    @staticmethod 
+    def get_kia_raw_file(date_str=None):
+        return get_raw_file_path("kia", date_str)
+    
+    # 기존 호환성을 위한 속성들 (오늘 날짜 기본값)
+    @property
+    def HYUNDAI_RAW_FILE(self):
+        return self.get_hyundai_raw_file()
+    
+    @property
+    def KIA_RAW_FILE(self):
+        return self.get_kia_raw_file()
+    
+    # Export paths (중간 처리 파일용, 사용 안함)
     EXPORT_DIR = "data/export"
     CLEANSING_HYUNDAI = "data/export/cleansing_hyundai.xlsx"
     CLEANSING_KIA = "data/export/cleansing_kia.xlsx" 
     CLEANSING_UNIFIED = "data/export/cleansing_stock_unified.xlsx"
     LISTING_UNIFIED = "data/export/stock_unified.xlsx"
     
+    # Results paths (최종 결과 파일용)
+    RESULTS_DIR = "results"
+    
+    @staticmethod
+    def get_results_file(file_type, date_str=None):
+        """결과 파일 경로를 생성"""
+        if date_str is None:
+            date_str = get_today_date_string()
+        
+        import os
+        results_dir = FilePaths.RESULTS_DIR
+        if not os.path.exists(results_dir):
+            os.makedirs(results_dir)
+            
+        if file_type == "all":
+            return os.path.join(results_dir, f"stock_all_{date_str}.xlsx")
+        elif file_type == "selected":
+            return os.path.join(results_dir, f"stock_selected_{date_str}.xlsx")
+        elif file_type == "upload":
+            return os.path.join(results_dir, f"stock_upload_{date_str}.xlsx")
+        else:
+            raise ValueError(f"Unknown file_type: {file_type}")
+    
     # Reference data
-    PRICE_REFERENCE = "data/reference/가격정보_통합.xlsx"
+    PRICE_REFERENCE = "data/reference/price_reference.xlsx"
 
 
 # 가격 계산 관련 상수
@@ -116,10 +180,11 @@ FINAL_COLUMN_ORDER = [
     "price_options",
     "price_tax",
     "price_registration",
+    "rebate",
+    "promotion",
     "subsidy_national",
     "subsidy_lease",
     "subsidy_tax",
-    "promotion",
     "fee_list",
     "fee_care",
     "fee_return_12m",
@@ -148,7 +213,7 @@ FINAL_COLUMN_ORDER = [
 # 데이터 처리 관련 상수
 class DataProcessing:
     # 재고 필터링 임계값
-    STOCK_THRESHOLD = 3
+    STOCK_THRESHOLD = 5
     
     # 기본 컬럼들
     BASE_COLUMNS = [

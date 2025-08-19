@@ -12,6 +12,7 @@ from src.cleansing.common import (
     reorder_cleansing_columns,
     clean_text,
 )
+from src.config.constants import FilePaths
 
 
 def extract_drive_and_seating(raw_trim):
@@ -37,7 +38,8 @@ def extract_drive_and_seating(raw_trim):
 
 def clean_data():
     """기아차 재고 데이터를 로드하고 전처리하는 함수"""
-    df_raw = pd.read_excel("data/raw/재고리스트_기아.xls", sheet_name=None)
+    file_path = FilePaths.get_kia_raw_file()
+    df_raw = pd.read_excel(file_path, sheet_name=None)
     df = df_raw["sheet1"]
 
     df = df.iloc[1:].reset_index(drop=True)

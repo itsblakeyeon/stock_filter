@@ -1,24 +1,10 @@
 #!/usr/bin/env python3
-"""
-Stock 프로젝트의 프라이싱 모듈
-Pricing 엔진을 사용하여 기존 기능 유지
-"""
-
 import pandas as pd
+import math
 import sys
 import os
 
-# Pricing 모듈 경로 추가
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-
-from Pricing import (
-    calculate_pricing_complete,
-    calculate_car_cost,
-    calculate_option_fees,
-    calculate_subscription_fees,
-    SubscriptionInput,
-    PricingConfig
-)
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from src.pricing.price_reference import (
     get_all_subsidy_data,
@@ -26,6 +12,7 @@ from src.pricing.price_reference import (
     find_price_by_key,
 )
 from src.config.constants import (
+    PricingConfig,
     YEAR_INFO,
     SUBSCRIPTION_TERMS,
     CostStructure,
@@ -33,6 +20,14 @@ from src.config.constants import (
 
 # 기존 코드와의 호환성을 위해 data 변수 생성
 subsidy_data = get_all_subsidy_data()
+
+
+def calculate_pmt(principal, annual_rate, months):
+    """월 할부금 계산"""
+    r = annual_rate / 12
+    if r == 0:
+        return principal / months
+    return principal * r * (1 + r) ** months / ((1 + r) ** months - 1)
 
 
 def match_subsidy(subsidy_trim):
@@ -150,72 +145,280 @@ def add_price_columns_to_df(df):
 
 
 def calculate_car_cost(car_price, fuel_type="", subsidy_trim="", company=""):
-    """
-    차량 비용 계산 - Pricing 엔진 사용
-    기존 인터페이스 호환성 유지
-    """
+    """차량 비용 계산"""
     # 보조금 계산
     subsidy_national, subsidy_lease = match_subsidy(subsidy_trim)
+    subsidy_tax = PricingConfig.ELECTRIC_TAX_SUBSIDY if fuel_type == "전기" else 0
     
-    # Pricing 엔진 사용
-    from Pricing import calculate_car_cost as pricing_calculate_car_cost
-    car_cost_detail, total_cost = pricing_calculate_car_cost(
-        car_price=car_price,
-        fuel_type=fuel_type,
-        subsidy_national=subsidy_national,
-        subsidy_lease=subsidy_lease,
-        company=company
-    )
-    
-    # 기존 형식으로 변환
+    # 리베이트 계산 (테슬라 제외)
+    rebate = -(car_price * 0.01) if str(company).strip() != "테슬라" else 0
+
     car = {
-        "car": car_cost_detail.car,
-        "tax": car_cost_detail.tax,
-        "subsidy_national": car_cost_detail.subsidy_national,
-        "subsidy_lease": car_cost_detail.subsidy_lease,
-        "subsidy_tax": car_cost_detail.subsidy_tax,
-        "rebate": car_cost_detail.rebate,
-        "plate": car_cost_detail.plate,
-        "promo": car_cost_detail.promo,
+        "car": car_price,
+        "tax": car_price * 0.07,
+        "subsidy_national": -(subsidy_national * 10000),  # 보조금은 차감(-)
+        "subsidy_lease": -(subsidy_lease * 10000),  # 보조금은 차감(-)
+        "subsidy_tax": -subsidy_tax,  # 보조금은 차감(-)
+        "rebate": rebate,  # 리베이트 추가
+        "plate": PricingConfig.REGISTRATION_FEE,
+        "promo": 0,
     }
-    return car, total_cost
+    return car, sum(car.values())
 
 
 def get_cost_structure():
-    """비용 구조 반환 - Pricing 엔진 사용"""
-    from Pricing.core.calculations import get_cost_structure as pricing_get_cost_structure
-    return pricing_get_cost_structure()
+    """비용 구조 반환"""
+    return sum(CostStructure.INITIAL_COSTS.values()), sum(
+        CostStructure.RECURRING_YEARLY_COSTS.values()
+    )
 
 
 def calculate_residual_values(car_cost):
-    """잔존가치 계산 - Pricing 엔진 사용"""
-    from Pricing.core.calculations import calculate_residual_values as pricing_calculate_residual_values
-    return pricing_calculate_residual_values(car_cost)
+    """잔존가치 계산"""
+    ratios = {
+        "Y1": 1 - PricingConfig.DEPRECIATION_RATE_5_YEARS,
+        "Y2": 1 - PricingConfig.DEPRECIATION_RATE_5_YEARS * 2,
+        "Y3": 1 - PricingConfig.DEPRECIATION_RATE_5_YEARS * 3,
+        "Y4": 1 - PricingConfig.DEPRECIATION_RATE_5_YEARS * 4,
+        "Y5": 1 - PricingConfig.DEPRECIATION_RATE_5_YEARS * 5,
+        "Y6": 1 - PricingConfig.DEPRECIATION_RATE_6_YEARS * 6,
+        "Y7": 1 - PricingConfig.DEPRECIATION_RATE_6_YEARS * 7,
+    }
+    return {year: round(car_cost * ratio) for year, ratio in ratios.items()}
 
 
-def calculate_subscription_fees(car_price, fuel_type="", subsidy_trim="", company=""):
-    """구독료 계산 메인 함수 - Pricing 엔진 사용"""
-    # 보조금 정보 가져오기
-    subsidy_national, subsidy_lease = match_subsidy(subsidy_trim)
-    
-    # Pricing 엔진 사용
-    subscription_input = SubscriptionInput(
-        car_price=car_price,
-        fuel_type=fuel_type,
-        subsidy_national=subsidy_national,
-        subsidy_lease=subsidy_lease,
-        company=company,
-        terms=[12, 36, 60, 84]
+def calculate_subscription_return_fee(year_label, discounted_costs, residual_values):
+    """반납형 구독료 계산"""
+    troi = YEAR_INFO[year_label]["troi"]["반납형"]
+    year_index = int(year_label[1])
+
+    if year_index <= 5:
+        cost_sum = sum(discounted_costs[f"Y{i}"] for i in range(0, 6))
+    else:
+        cost_sum = sum(discounted_costs[f"Y{i}"] for i in range(0, year_index + 1))
+
+    residual_value = residual_values[year_label]
+    discount_factor = YEAR_INFO[year_label]["discount"]
+    numerator = ((100 + troi) / 100) * cost_sum - residual_value * discount_factor
+    denominator = (
+        sum(YEAR_INFO[f"Y{i}"]["discount"] for i in range(1, year_index + 1)) * 12
     )
-    
-    from Pricing.core.calculations import calculate_subscription_fees as pricing_calculate_subscription_fees
-    return pricing_calculate_subscription_fees(subscription_input)
+
+    subscription_fee = (
+        (numerator / denominator) * PricingConfig.RETURN_TYPE_LOSS / 10000
+    )
+    return math.ceil(subscription_fee) * 10000
+
+
+def calculate_early_repayment_fees_by_term(
+    car_cost, down_payment, annual_rate, total_months
+):
+    """중도상환 수수료 계산"""
+    early_fees = {}
+    for months in range(12, 85, 12):
+        r = annual_rate / 12
+        total_principal = car_cost - down_payment
+        pmt = calculate_pmt(total_principal, annual_rate, total_months)
+
+        balance = total_principal
+        for m in range(1, months + 1):
+            interest = balance * r
+            principal_payment = pmt - interest
+            balance -= principal_payment
+
+        remaining_balance = balance
+        early_fee = round(remaining_balance * 0.01)
+        early_fees[months] = {"잔금": remaining_balance, "중도상환수수료": early_fee}
+    return early_fees
+
+
+def cost_own_by_year(
+    n_years,
+    down_payment,
+    init_setup_cost,
+    installment_payment_yearly,
+    recurring_cost_1y,
+    early_repayment_fees_by_term,
+):
+    """인수형 연도별 비용 계산"""
+    total = (down_payment + init_setup_cost) * YEAR_INFO["Y0"]["discount"]
+
+    for i in range(1, min(n_years, 5) + 1):
+        discount = YEAR_INFO.get(f"Y{i}", {"discount": 1.0})["discount"]
+        if i == n_years and n_years <= 5:
+            term = i * 12
+            add = (
+                installment_payment_yearly
+                + recurring_cost_1y
+                + early_repayment_fees_by_term[term]["잔금"]
+                + early_repayment_fees_by_term[term]["중도상환수수료"]
+            )
+        else:
+            add = installment_payment_yearly + recurring_cost_1y
+        total += add * discount
+
+    if n_years > 5:
+        for i in range(6, n_years + 1):
+            discount = YEAR_INFO.get(f"Y{i}", {"discount": 1.0})["discount"]
+            total += recurring_cost_1y * discount
+
+    return total
+
+
+def calculate_subscription_own_fee(
+    year_label,
+    down_payment,
+    init_setup_cost,
+    installment_payment_yearly,
+    recurring_cost_1y,
+    early_repayment_fees_by_term,
+):
+    """인수형 구독료 계산"""
+    troi = YEAR_INFO[year_label]["troi"]["인수형"]
+    year_index = int(year_label[1])
+
+    cost_sum = cost_own_by_year(
+        year_index,
+        down_payment,
+        init_setup_cost,
+        installment_payment_yearly,
+        recurring_cost_1y,
+        early_repayment_fees_by_term,
+    )
+    numerator = ((100 + troi) / 100) * cost_sum
+    denominator = (
+        sum(YEAR_INFO[f"Y{i}"]["discount"] for i in range(1, year_index + 1)) * 12
+    )
+
+    subscription_fee = (
+        (numerator / denominator) * PricingConfig.PURCHASE_TYPE_LOSS / 10000
+    )
+    return math.ceil(subscription_fee) * 10000
 
 
 def calculate_option_fees(price_options):
-    """옵션 프라이싱 계산 함수 - Pricing 엔진 사용"""
-    from Pricing.core.calculations import calculate_option_fees as pricing_calculate_option_fees
-    return pricing_calculate_option_fees(price_options, [12, 36, 60, 84])
+    """옵션 프라이싱 계산 함수 (12, 36, 60, 84개월만)"""
+    # 필요한 기간만 계산
+    required_terms = [12, 36, 60, 84]
+
+    # 각 기간별 discount 합계 계산
+    discount_sums = {}
+    for term in required_terms:
+        # term에 해당하는 year 찾기
+        year_count = 0
+        if term == 12:
+            year_count = 1
+        elif term == 36:
+            year_count = 3
+        elif term == 60:
+            year_count = 5
+        elif term == 84:
+            year_count = 7
+
+        discount_sum = sum(
+            YEAR_INFO[f"Y{j}"]["discount"] for j in range(1, year_count + 1)
+        )
+        discount_sums[term] = discount_sum
+
+    # 각 기간별 옵션 요금 계산
+    option_fees = {}
+    for term, discount_sum in discount_sums.items():
+        fee = price_options * 1.5 / discount_sum / 12  # premium 50%
+        # 3번째 자리에서 라운드업 (1000원 단위)
+        option_fees[f"fee_options_{term}m"] = math.ceil(fee / 1000) * 1000
+
+    return option_fees
+
+
+def calculate_subscription_fees(car_price, fuel_type="", subsidy_trim="", company=""):
+    """구독료 계산 메인 함수"""
+    # 차량 비용 계산
+    car, car_cost = calculate_car_cost(car_price, fuel_type, subsidy_trim, company)
+    down_payment = car["car"] * PricingConfig.DOWN_PAYMENT_RATE
+
+    # 할부금 계산
+    installment_months = 60
+    monthly_payment = calculate_pmt(
+        car_cost - down_payment, PricingConfig.INTEREST_RATE, installment_months
+    )
+    installment_payment_yearly = monthly_payment * 12
+
+    # 비용 구조
+    init_setup_cost, recurring_cost_1y = get_cost_structure()
+
+    # 연도별 비용
+    cost_by_year = {
+        "Y0": down_payment + init_setup_cost,
+        "Y1": installment_payment_yearly + recurring_cost_1y,
+        "Y2": installment_payment_yearly + recurring_cost_1y,
+        "Y3": installment_payment_yearly + recurring_cost_1y,
+        "Y4": installment_payment_yearly + recurring_cost_1y,
+        "Y5": installment_payment_yearly + recurring_cost_1y,
+        "Y6": recurring_cost_1y,
+        "Y7": recurring_cost_1y,
+    }
+
+    # 할인된 비용
+    discounted_costs = {
+        year: cost_by_year[year] * YEAR_INFO[year]["discount"] for year in cost_by_year
+    }
+
+    # 잔존가치
+    residual_values = calculate_residual_values(car_cost)
+
+    # 반납형 구독료 (12, 36, 60, 84개월만)
+    return_fees = {}
+    required_terms = [12, 36, 60, 84]
+
+    for term in required_terms:
+        # term에 해당하는 year 찾기
+        year_count = 0
+        if term == 12:
+            year_count = 1
+        elif term == 36:
+            year_count = 3
+        elif term == 60:
+            year_count = 5
+        elif term == 84:
+            year_count = 7
+
+        year_label = f"Y{year_count}"
+        fee = calculate_subscription_return_fee(
+            year_label, discounted_costs, residual_values
+        )
+        return_fees[f"fee_return_{term}m"] = fee
+
+    # 인수형 중도상환 수수료
+    early_repayment_fees = calculate_early_repayment_fees_by_term(
+        car_cost, down_payment, PricingConfig.INTEREST_RATE, installment_months
+    )
+
+    # 인수형 구독료 (12, 36, 60, 84개월만)
+    own_fees = {}
+    for term in required_terms:
+        # term에 해당하는 year 찾기
+        year_count = 0
+        if term == 12:
+            year_count = 1
+        elif term == 36:
+            year_count = 3
+        elif term == 60:
+            year_count = 5
+        elif term == 84:
+            year_count = 7
+
+        year_label = f"Y{year_count}"
+        fee = calculate_subscription_own_fee(
+            year_label,
+            down_payment,
+            init_setup_cost,
+            installment_payment_yearly,
+            recurring_cost_1y,
+            early_repayment_fees,
+        )
+        own_fees[f"fee_purchase_{term}m"] = fee
+
+    return {**return_fees, **own_fees}
 
 
 def calculate_pricing(df):
@@ -344,7 +547,7 @@ def calculate_pricing(df):
                     df.at[idx, fee_name] = fee_value
             except (ValueError, TypeError):
                 # 옵션 요금을 0으로 설정
-                for term in [12, 36, 60, 84]:
+                for term in [12, 24, 36, 48, 60, 72, 84]:
                     fee_name = f"fee_options_{term}m"
                     if fee_name not in option_columns:
                         option_columns.append(fee_name)

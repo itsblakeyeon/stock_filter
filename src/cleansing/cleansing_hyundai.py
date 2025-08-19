@@ -6,6 +6,7 @@ import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from src.cleansing.common import extract_year, initialize_base_columns, reorder_cleansing_columns, clean_text
+from src.config.constants import FilePaths
 
 
 def clean_data():
@@ -13,7 +14,8 @@ def clean_data():
     print("재고 데이터 로드 및 전처리 시작...")
     
     # 데이터 로드 및 정리
-    df_raw = pd.read_excel("data/raw/재고리스트_현대.xlsx", sheet_name=None)
+    file_path = FilePaths.get_hyundai_raw_file()
+    df_raw = pd.read_excel(file_path, sheet_name=None)
     df_list = []
     for sheet, df in df_raw.items():
         if "조건" not in sheet:
@@ -22,8 +24,8 @@ def clean_data():
     df = pd.concat(df_list, ignore_index=True)
     df = df.dropna(subset=["가격"])
     
-    # 컬럼 정리 - 올바른 컬럼 매핑
-    df = df[["판매코드", "Unnamed: 1", "칼라코드", "Unnamed: 3", "요청", "재고", "차종", "옵션", "외/내장칼라", "Unnamed: 9", "가격", "시트명"]]
+    # 컬럼 정리 - 새로운 현대 데이터 구조에 맞게 수정
+    df = df[["판매코드", "Unnamed: 2", "칼라코드", "Unnamed: 4", "요청", "재고", "차종", "옵션", "외/내장칼라", "Unnamed: 10", "가격", "시트명"]]
     df.columns = ["code_sales_a", "code_sales_b", "code_color_a", "code_color_b", "request", "stock", "trim_raw", "options", "color_exterior", "color_interior", "price_car_original", "model_raw"]  # type: ignore
     
     # 기본 필드들 초기화 (공통 함수 사용)
@@ -103,7 +105,7 @@ def extract_model_from_raw_model(raw_model):
     """Raw_모델에서 특정 케이스 규칙에 따라 모델 정보를 추출하는 함수"""
     # 모델명 패턴 매칭
     model_patterns = [
-        "팰리세이드", "싼타페", "아이오닉9", "아반떼", "캐스퍼"
+        "팰리세이드", "싼타페", "아이오닉9", "아반떼", "캐스퍼", "그랜저", "투싼", "쏘나타", "스타리아"
     ]
     
     for pattern in model_patterns:
@@ -127,6 +129,14 @@ def extract_trim_by_model(raw_trim, sheet_name):
     elif model == "아반떼":
         trim_patterns = ["Modern", "Smart", "Inspiration", "N", "N Line", "하이브리드"]
     elif model == "캐스퍼":
+        trim_patterns = ["인스퍼레이션"]
+    elif model == "그랜저":
+        trim_patterns = ["캘리그래피", "익스클루시브", "프리미엄", "아너스", "고급형"]
+    elif model == "투싼":
+        trim_patterns = ["프리미엄", "인스퍼레이션"]
+    elif model == "쏘나타":
+        trim_patterns = ["익스클루시브", "인스퍼레이션"]
+    elif model == "스타리아":
         trim_patterns = ["인스퍼레이션"]
     else:
         return "?"
@@ -172,6 +182,8 @@ def extract_fuel(raw_model):
         return "전기"
     elif "하이브리드" in raw_model:
         return "하이브리드"
+    elif "LPi" in raw_model:
+        return "LPI"
     elif "가솔린" in raw_model:
         return "가솔린"
     else:
