@@ -35,7 +35,10 @@ def main(cleaned_df=None):
     
     # 기본 필터링: 재고 5 이상
     from src.config.constants import DataProcessing
+    print(f"🔍 필터링 전: {len(result_df)}대, 컬럼 수: {len(result_df.columns)}")
+    
     filtered_df = result_df[result_df["stock"] >= DataProcessing.STOCK_THRESHOLD].copy()
+    print(f"🔍 재고 {DataProcessing.STOCK_THRESHOLD} 이상 필터 후: {len(filtered_df)}대")
     
     # 추가 필터링 조건 적용
     # 1) 가격 정보 있는 차량만 (price_car_tax_pre, price_car_tax_post, price_options가 ?가 아닌 것)
@@ -48,10 +51,23 @@ def main(cleaned_df=None):
                 price_post != "?" and price_post != "" and pd.notna(row.get("price_car_tax_post")) and
                 price_options != "?" and price_options != "" and pd.notna(row.get("price_options")))
     
+    # 가격 컬럼 상태 디버깅
+    print(f"🔍 가격 컬럼 존재 여부:")
+    print(f"  - price_car_tax_pre: {'✅' if 'price_car_tax_pre' in filtered_df.columns else '❌'}")
+    print(f"  - price_car_tax_post: {'✅' if 'price_car_tax_post' in filtered_df.columns else '❌'}")  
+    print(f"  - price_options: {'✅' if 'price_options' in filtered_df.columns else '❌'}")
+    
+    if 'price_car_tax_pre' in filtered_df.columns:
+        unique_pre = filtered_df['price_car_tax_pre'].unique()[:3]
+        print(f"  - price_car_tax_pre 샘플: {unique_pre}")
+    
     filtered_df = filtered_df[filtered_df.apply(has_valid_price_info, axis=1)].copy()
+    print(f"🔍 가격 정보 필터 후: {len(filtered_df)}대")
     
     # 2) 기본 휠&타이어만
-    filtered_df = filtered_df[filtered_df["wheel_tire"] == "기본 휠&타이어"].copy()
+    if len(filtered_df) > 0:
+        filtered_df = filtered_df[filtered_df["wheel_tire"] == "기본 휠&타이어"].copy()
+        print(f"🔍 기본 휠&타이어 필터 후: {len(filtered_df)}대")
     
     # 3) 빌트인캠만 포함하는 차량 필터링 (무옵션 제외)
     def filter_builtin_cam_only(df):
@@ -77,11 +93,19 @@ def main(cleaned_df=None):
     filtered_df = filtered_df.drop(columns=[col for col in columns_to_remove if col in filtered_df.columns])
     
     
-    # 7. 회사별 통계 출력
+    # 7. 회사별 통계 출력 (안전한 처리)
     print(f"\n📊 회사별 통계:")
-    company_stats = filtered_df["company"].value_counts()
-    for company, count in company_stats.items():
-        print(f"  {company}: {count}대")
+    if len(filtered_df) == 0:
+        print("  필터링된 차량이 없습니다.")
+    elif "company" not in filtered_df.columns:
+        print("  company 컬럼이 존재하지 않습니다.")
+    else:
+        try:
+            company_stats = filtered_df["company"].value_counts()
+            for company, count in company_stats.items():
+                print(f"  {company}: {count}대")
+        except Exception as e:
+            print(f"  통계 생성 실패: {e}")
     
     print(f"\n✅ 완료! {len(filtered_df)}대 차량")
     print(f"📊 필터링 조건: 재고 {DataProcessing.STOCK_THRESHOLD} 이상 + 가격정보 있음 + 기본 휠&타이어 + 빌트인캠만")
