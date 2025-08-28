@@ -10,7 +10,7 @@ import os
 def load_price_reference_data():
     """통합 가격 참조 데이터를 엑셀 파일에서 로드하는 함수"""
     try:
-        file_path = "pricing/data/price_reference.xlsx"
+        file_path = "data/reference/price_reference.xlsx"
         if os.path.exists(file_path):
             # 보조금 데이터 로드
             subsidy_df = pd.read_excel(file_path, sheet_name='보조금')

@@ -33,12 +33,11 @@ def main(cleaned_df=None):
     result_df["stock"] = pd.to_numeric(result_df["stock"], errors='coerce')
     result_df["stock"] = result_df["stock"].fillna(0).astype(int)
     
-    # 기본 필터링: 재고 5 이상
-    from src.config.constants import DataProcessing
+    # 재고 제한 없음
     print(f"🔍 필터링 전: {len(result_df)}대, 컬럼 수: {len(result_df.columns)}")
     
-    filtered_df = result_df[result_df["stock"] >= DataProcessing.STOCK_THRESHOLD].copy()
-    print(f"🔍 재고 {DataProcessing.STOCK_THRESHOLD} 이상 필터 후: {len(filtered_df)}대")
+    filtered_df = result_df.copy()
+    print(f"🔍 재고 제한 없음: {len(filtered_df)}대")
     
     # 추가 필터링 조건 적용
     # 1) 가격 정보 있는 차량만 (price_car_tax_pre, price_car_tax_post, price_options가 ?가 아닌 것)
@@ -64,26 +63,62 @@ def main(cleaned_df=None):
     filtered_df = filtered_df[filtered_df.apply(has_valid_price_info, axis=1)].copy()
     print(f"🔍 가격 정보 필터 후: {len(filtered_df)}대")
     
-    # 2) 기본 휠&타이어만
+    # 2) 기본 휠&타이어만 (GV70은 18인치가 기본)
     if len(filtered_df) > 0:
-        filtered_df = filtered_df[filtered_df["wheel_tire"] == "기본 휠&타이어"].copy()
-        print(f"🔍 기본 휠&타이어 필터 후: {len(filtered_df)}대")
+        def is_basic_wheel_tire(row):
+            wheel_tire = str(row.get("wheel_tire", "")).strip()
+            company = str(row.get("company", "")).strip()
+            
+            # 제네시스 브랜드는 18인치를 기본으로 간주
+            if company == "제네시스" and "18인치" in wheel_tire:
+                return True
+            
+            # 일반적인 기본 휠&타이어
+            return wheel_tire == "기본 휠&타이어"
+        
+        filtered_df = filtered_df[filtered_df.apply(is_basic_wheel_tire, axis=1)].copy()
+        print(f"🔍 기본 휠&타이어 필터 후 (제네시스 18인치 포함): {len(filtered_df)}대")
     
-    # 3) 빌트인캠만 포함하는 차량 필터링 (무옵션 제외)
-    def filter_builtin_cam_only(df):
-        def has_only_builtin_cam(option_str):
+    # 3) 빌트인캠만 또는 무옵션 차량 필터링
+    def filter_builtin_cam_or_no_option(df):
+        def has_builtin_cam_only_or_no_option(option_str):
             if pd.isna(option_str) or option_str == "":
-                return False  # 무옵션 제외
+                return True  # 무옵션 포함
             option_str = str(option_str).strip()
             if option_str == "" or option_str == "무옵션":
-                return False  # 빈 문자열이나 "무옵션" 텍스트 제외
-            # 빌트인캠만 있는지 확인 (쉼표로 구분된 옵션들 중 빌트인캠만 있는지)
+                return True  # 무옵션 포함
+            # 빌트인캠 또는 빌트인 캠 패키지만 있는지 확인 (쉼표로 구분된 옵션들 중 하나만 있는지)
             options = [opt.strip() for opt in option_str.split(',') if opt.strip()]
-            return len(options) == 1 and "빌트인캠" in options[0]
+            return (len(options) == 1 and 
+                   ("빌트인캠" in options[0] or "빌트인 캠 패키지" in options[0]))
         
-        return df[df["options"].apply(has_only_builtin_cam)]
+        return df[df["options"].apply(has_builtin_cam_only_or_no_option)]
     
-    filtered_df = filter_builtin_cam_only(filtered_df)
+    filtered_df = filter_builtin_cam_or_no_option(filtered_df)
+    print(f"🔍 빌트인캠 또는 무옵션 필터 후: {len(filtered_df)}대")
+    
+    # 4) 싼타페 하이브리드 5인승 & 팰리세이드 9인승 필터링
+    def filter_seating_requirements(df):
+        def should_exclude_by_seating(row):
+            model = str(row.get("model", "")).strip()
+            trim_raw = str(row.get("trim_raw", "")).strip()
+            
+            # 싼타페 하이브리드인 경우: 6인승, 7인승 제외 (5인승만)
+            if model == "싼타페 하이브리드":
+                if "6인승" in trim_raw or "7인승" in trim_raw:
+                    return True  # 제외
+            
+            # 팰리세이드인 경우: 7인승, 8인승 제외 (9인승만)
+            if "팰리세이드" in model or "디 올 뉴 팰리세이드" in model:
+                if "7인승" in trim_raw or "8인승" in trim_raw:
+                    return True  # 제외
+            
+            return False  # 포함
+        
+        return df[~df.apply(should_exclude_by_seating, axis=1)]
+    
+    filtered_df = filter_seating_requirements(filtered_df)
+    print(f"🔍 승차정원 필터 후 (싼타페하이브리드 5인승, 팰리세이드 9인승): {len(filtered_df)}대")
     
     # 5. 24, 48, 72개월 가격 컬럼 제거
     columns_to_remove = [
@@ -108,7 +143,7 @@ def main(cleaned_df=None):
             print(f"  통계 생성 실패: {e}")
     
     print(f"\n✅ 완료! {len(filtered_df)}대 차량")
-    print(f"📊 필터링 조건: 재고 {DataProcessing.STOCK_THRESHOLD} 이상 + 가격정보 있음 + 기본 휠&타이어 + 빌트인캠만")
+    print(f"📊 필터링 조건: 재고 제한 없음 + 가격정보 있음 + 기본 휠&타이어 + (빌트인캠 또는 무옵션) + 싼타페하이브리드 5인승 + 팰리세이드 9인승")
     print(f"📊 구독료 컬럼: {len(filtered_df.columns)-18}개")
     
     # 8. 필터링된 데이터 반환

@@ -58,6 +58,12 @@ def main():
     st.title("🚗 재고 데이터 통합 처리 시스템")
     st.markdown("---")
 
+    # 세션 상태 초기화
+    if "processing_complete" not in st.session_state:
+        st.session_state.processing_complete = False
+    if "results_data" not in st.session_state:
+        st.session_state.results_data = None
+
     # 처리 설정 및 사용 방법 (2열 배치)
     st.subheader("📋 처리 설정 및 사용 방법")
     
@@ -116,6 +122,10 @@ def main():
         if hyundai_file is None or kia_file is None:
             st.error("❌ 현대와 기아 재고 파일을 모두 업로드해주세요.")
             return
+        
+        # 새로운 처리 시작 시 이전 결과 초기화
+        st.session_state.processing_complete = False
+        st.session_state.results_data = None
 
         try:
             with st.spinner("📋 데이터 처리 중..."):
@@ -224,79 +234,15 @@ def main():
                         progress_bar.progress(100)
                         status_text.text("✅ 모든 처리 완료!")
 
-                        # 결과 표시
-                        st.markdown("---")
-                        st.subheader("📊 처리 결과")
+                        # 결과를 세션 상태에 저장
+                        st.session_state.processing_complete = True
+                        st.session_state.results_data = {
+                            'df_selected': df_selected,
+                            'df_all': df_all,
+                            'df_upload': df_upload,
+                            'date_str': date_str
+                        }
 
-                        col1, col2, col3 = st.columns(3)
-                        with col1:
-                            st.metric(
-                                "선택된 차량",
-                                f"{len(df_selected)}대",
-                                f"재고 {DataProcessing.STOCK_THRESHOLD} 이상",
-                            )
-                        with col2:
-                            st.metric("전체 차량", f"{len(df_all)}대", "모든 차량")
-                        with col3:
-                            st.metric(
-                                "업로드용",
-                                f"{len(df_upload)}대",
-                                f"{len(df_upload.columns)}개 컬럼",
-                            )
-
-                        # 다운로드 버튼들
-                        st.markdown("---")
-                        st.subheader("📥 결과 파일 다운로드")
-
-                        col1, col2, col3 = st.columns(3)
-
-                        with col1:
-                            selected_excel = create_download_file(
-                                df_selected, "selected", date_str
-                            )
-                            st.download_button(
-                                label="📋 선택된 차량 다운로드",
-                                data=selected_excel,
-                                file_name=f"stock_selected_{date_str}.xlsx",
-                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                            )
-
-                        with col2:
-                            all_excel = create_download_file(df_all, "all", date_str)
-                            st.download_button(
-                                label="📋 전체 차량 다운로드",
-                                data=all_excel,
-                                file_name=f"stock_all_{date_str}.xlsx",
-                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                            )
-
-                        with col3:
-                            upload_excel = create_download_file(
-                                df_upload, "upload", date_str
-                            )
-                            st.download_button(
-                                label="📋 업로드용 다운로드",
-                                data=upload_excel,
-                                file_name=f"stock_upload_{date_str}.xlsx",
-                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                            )
-
-                        # 데이터 미리보기
-                        st.markdown("---")
-                        st.subheader("👀 데이터 미리보기")
-
-                        tab1, tab2, tab3 = st.tabs(
-                            ["선택된 차량", "전체 차량", "업로드용"]
-                        )
-
-                        with tab1:
-                            st.dataframe(df_selected.head(10), use_container_width=True)
-
-                        with tab2:
-                            st.dataframe(df_all.head(10), use_container_width=True)
-
-                        with tab3:
-                            st.dataframe(df_upload.head(10), use_container_width=True)
 
                     finally:
                         # 원래 함수들 복원
@@ -309,6 +255,96 @@ def main():
             st.error(f"❌ 처리 중 오류가 발생했습니다: {str(e)}")
             st.exception(e)
 
+    # 처리 완료된 결과가 있으면 표시
+    if st.session_state.processing_complete and st.session_state.results_data:
+        results = st.session_state.results_data
+        df_selected = results['df_selected']
+        df_all = results['df_all']
+        df_upload = results['df_upload']
+        date_str = results['date_str']
+
+        # 결과 표시
+        st.markdown("---")
+        st.subheader("📊 처리 결과")
+
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric(
+                "선택된 차량",
+                f"{len(df_selected)}대",
+                f"재고 {DataProcessing.STOCK_THRESHOLD} 이상",
+            )
+        with col2:
+            st.metric("전체 차량", f"{len(df_all)}대", "모든 차량")
+        with col3:
+            st.metric(
+                "업로드용",
+                f"{len(df_upload)}대",
+                f"{len(df_upload.columns)}개 컬럼",
+            )
+
+        # 다운로드 버튼들
+        st.markdown("---")
+        st.subheader("📥 결과 파일 다운로드")
+
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            selected_excel = create_download_file(
+                df_selected, "selected", date_str
+            )
+            st.download_button(
+                label="📋 선택된 차량 다운로드",
+                data=selected_excel,
+                file_name=f"stock_selected_{date_str}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="download_selected"
+            )
+
+        with col2:
+            all_excel = create_download_file(df_all, "all", date_str)
+            st.download_button(
+                label="📋 전체 차량 다운로드",
+                data=all_excel,
+                file_name=f"stock_all_{date_str}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="download_all"
+            )
+
+        with col3:
+            upload_excel = create_download_file(
+                df_upload, "upload", date_str
+            )
+            st.download_button(
+                label="📋 업로드용 다운로드",
+                data=upload_excel,
+                file_name=f"stock_upload_{date_str}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="download_upload"
+            )
+
+        # 결과 초기화 버튼
+        if st.button("🔄 새로운 처리 시작", type="secondary"):
+            st.session_state.processing_complete = False
+            st.session_state.results_data = None
+            st.rerun()
+
+        # 데이터 미리보기
+        st.markdown("---")
+        st.subheader("👀 데이터 미리보기")
+
+        tab1, tab2, tab3 = st.tabs(
+            ["선택된 차량", "전체 차량", "업로드용"]
+        )
+
+        with tab1:
+            st.dataframe(df_selected.head(10), use_container_width=True)
+
+        with tab2:
+            st.dataframe(df_all.head(10), use_container_width=True)
+
+        with tab3:
+            st.dataframe(df_upload.head(10), use_container_width=True)
 
 
 if __name__ == "__main__":

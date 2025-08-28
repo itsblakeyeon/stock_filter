@@ -51,13 +51,6 @@ class FilePaths:
     def KIA_RAW_FILE(self):
         return self.get_kia_raw_file()
     
-    # Export paths (중간 처리 파일용, 사용 안함)
-    EXPORT_DIR = "data/export"
-    CLEANSING_HYUNDAI = "data/export/cleansing_hyundai.xlsx"
-    CLEANSING_KIA = "data/export/cleansing_kia.xlsx" 
-    CLEANSING_UNIFIED = "data/export/cleansing_stock_unified.xlsx"
-    LISTING_UNIFIED = "data/export/stock_unified.xlsx"
-    
     # Results paths (최종 결과 파일용)
     RESULTS_DIR = "results"
     

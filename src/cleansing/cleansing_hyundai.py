@@ -84,6 +84,10 @@ def apply_cleansing_rules(df):
         if df.at[idx, "model"] == "싼타페" and "하이브리드" in raw_trim:
             df.at[idx, "model"] = "싼타페 하이브리드"
         
+        # GV70인 경우 회사명을 제네시스로 변경
+        if df.at[idx, "model"] == "GV70":
+            df.at[idx, "company"] = "제네시스"
+        
         # 연식 추출
         df.at[idx, "year"] = extract_year(raw_trim)
         
@@ -105,11 +109,13 @@ def extract_model_from_raw_model(raw_model):
     """Raw_모델에서 특정 케이스 규칙에 따라 모델 정보를 추출하는 함수"""
     # 모델명 패턴 매칭
     model_patterns = [
-        "팰리세이드", "싼타페", "아이오닉9", "아반떼", "캐스퍼", "그랜저", "투싼", "쏘나타", "스타리아"
+        "팰리세이드", "싼타페", "아이오닉9", "아반떼", "캐스퍼", "그랜저", "투싼", "쏘나타", "스타리아", "GV70"
     ]
     
     for pattern in model_patterns:
         if pattern in raw_model:
+            if pattern == "팰리세이드":
+                return "디 올 뉴 팰리세이드"
             return pattern
     
     return "?"
@@ -120,14 +126,56 @@ def extract_trim_by_model(raw_trim, sheet_name):
     # sheet_name에서 모델 정보 추출
     model = extract_model_from_raw_model(sheet_name)
     
-    if model == "팰리세이드":
-        trim_patterns = ["캘리그래피", "프레스티지", "익스클루시브"]
+    if model == "디 올 뉴 팰리세이드":
+        # 팰리세이드는 연료타입 + 트림 조합으로 처리
+        if "하이브리드" in raw_trim:
+            fuel_prefix = "하이브리드"
+        elif "가솔린" in raw_trim:
+            fuel_prefix = "가솔린"
+        else:
+            return "?"  # 연료타입을 찾을 수 없으면 ?
+        
+        # 트림 패턴 매칭
+        if "캘리그래피" in raw_trim:
+            return f"{fuel_prefix} 캘리그래피"
+        elif "프레스티지" in raw_trim:
+            return f"{fuel_prefix} 프레스티지"
+        elif "익스클루시브" in raw_trim:
+            return f"{fuel_prefix} 익스클루시브"
+        else:
+            return "?"  # 트림을 찾을 수 없으면 ?
     elif model == "싼타페":
         trim_patterns = ["캘리그래피", "프레스티지 플러스", "프레스티지", "익스클루시브"]
     elif model == "아이오닉9":
         trim_patterns = ["CALLIGRAPHY", "PRESTIGE", "EXCLUSIVE"]
     elif model == "아반떼":
-        trim_patterns = ["Modern", "Smart", "Inspiration", "N", "N Line", "하이브리드"]
+        # 아반떼는 연료타입 + 트림 조합으로 처리
+        if "하이브리드" in raw_trim:
+            fuel_prefix = "하이브리드"
+        elif "가솔린" in raw_trim:
+            fuel_prefix = "가솔린"
+        elif "LPG" in raw_trim:
+            fuel_prefix = "LPG"
+        else:
+            return "?"  # 연료타입을 찾을 수 없으면 ?
+        
+        # 트림 패턴 매칭 (긴 패턴부터 확인)
+        if "N Line Inspiration" in raw_trim:
+            return f"{fuel_prefix} N 라인"
+        elif "N Line" in raw_trim:
+            return f"{fuel_prefix} N 라인"
+        elif "Modern" in raw_trim and "라이트" in raw_trim:
+            return f"{fuel_prefix} 모던 라이트"
+        elif "Modern" in raw_trim:
+            return f"{fuel_prefix} 모던"
+        elif "Smart" in raw_trim:
+            return f"{fuel_prefix} 스마트"
+        elif "Inspiration" in raw_trim:
+            return f"{fuel_prefix} 인스퍼레이션"
+        elif "N DCT" in raw_trim or "N M/T" in raw_trim:
+            return f"{fuel_prefix} N"
+        else:
+            return "?"
     elif model == "캐스퍼":
         trim_patterns = ["인스퍼레이션"]
     elif model == "그랜저":
@@ -138,6 +186,20 @@ def extract_trim_by_model(raw_trim, sheet_name):
         trim_patterns = ["익스클루시브", "인스퍼레이션"]
     elif model == "스타리아":
         trim_patterns = ["인스퍼레이션"]
+    elif model == "GV70":
+        # GV70은 연료타입 + 엔진 조합으로 처리
+        if "가솔린" in raw_trim:
+            fuel_prefix = "가솔린"
+        else:
+            return "?"  # 연료타입을 찾을 수 없으면 ?
+        
+        # 엔진 패턴 매칭
+        if "2.5T" in raw_trim:
+            return f"{fuel_prefix} 터보 2.5"
+        elif "3.5T" in raw_trim:
+            return f"{fuel_prefix} 터보 3.5"
+        else:
+            return "?"  # 엔진을 찾을 수 없으면 ?
     else:
         return "?"
     
