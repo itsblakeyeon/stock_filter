@@ -15,7 +15,6 @@ from src.pricing.pricing_unified import main as pricing_main
 from src.listing.listing_unified import main as listing_main
 from src.config.constants import (
     FINAL_COLUMN_ORDER,
-    DataProcessing,
     get_today_date_string,
     set_global_date,
 )
@@ -137,9 +136,7 @@ def main():
     print(f"\n🎉 모든 처리 완료!")
     print(f"📅 처리 날짜: {current_date}")
     print(f"📁 결과 폴더: results/")
-    print(
-        f"   - stock_selected_{current_date}.xlsx (재고 {DataProcessing.STOCK_THRESHOLD} 이상)"
-    )
+    print(f"   - stock_selected_{current_date}.xlsx (재고 3개 이상)")
     print(f"   - stock_all_{current_date}.xlsx (전체 차량)")
     print(f"   - stock_upload_{current_date}.xlsx (필터링+선택 컬럼)")
 
@@ -154,17 +151,48 @@ def reorder_columns(df):
 
 
 def create_selected_file(date_str, listed_df):
-    """선택된 결과 파일 생성 (재고 조건 이상)"""
+    """선택된 결과 파일 생성 (재고 3개 이상) - 무옵션/빌트인 캠 별도 시트"""
     from src.config.constants import FilePaths
+    import pandas as pd
 
-    df_selected = reorder_columns(listed_df)
+    # 재고 3개 이상 필터링
+    df_filtered = (
+        listed_df[listed_df["stock"] >= 3].copy()
+        if "stock" in listed_df.columns
+        else listed_df.copy()
+    )
+    df_selected = reorder_columns(df_filtered)
+
+    # 무옵션과 빌트인 캠으로 분리 (정확한 빌트인캠 옵션만)
+    df_no_options = df_selected[df_selected["options"] == "무옵션"].copy()
+
+    def is_pure_builtin_cam(option_str):
+        if pd.isna(option_str) or str(option_str).strip() in ["", "무옵션"]:
+            return False
+        option_str = str(option_str).strip()
+        return option_str in ["빌트인캠", "빌트인 캠 패키지", "빌트인캠2"]
+
+    df_builtin_cam = df_selected[
+        df_selected["options"].apply(is_pure_builtin_cam)
+    ].copy()
 
     selected_filename = FilePaths.get_results_file("selected", date_str)
-    df_selected.to_excel(selected_filename, index=False)
+
+    # ExcelWriter를 사용하여 여러 시트로 저장
+    with pd.ExcelWriter(selected_filename, engine="openpyxl") as writer:
+        if not df_no_options.empty:
+            df_no_options.to_excel(writer, sheet_name="무옵션", index=False)
+        if not df_builtin_cam.empty:
+            df_builtin_cam.to_excel(writer, sheet_name="빌트인캠", index=False)
+
+        # 전체 데이터도 별도 시트로 추가
+        df_selected.to_excel(writer, sheet_name="전체", index=False)
+
     print(f"✅ 선택된 결과 파일 생성: {selected_filename}")
     print(
-        f"📊 선택된 차량: {len(df_selected)}대 (재고 {DataProcessing.STOCK_THRESHOLD} 이상), {len(df_selected.columns)}개 컬럼"
+        f"📊 전체: {len(df_selected)}대 (재고 3개 이상), 무옵션: {len(df_no_options)}대, 빌트인캠: {len(df_builtin_cam)}대"
     )
+    print(f"📊 컬럼 수: {len(df_selected.columns)}개")
     return True
 
 

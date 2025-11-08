@@ -66,9 +66,9 @@ def main():
 
     # 처리 설정 및 사용 방법 (2열 배치)
     st.subheader("📋 처리 설정 및 사용 방법")
-    
+
     col1, col2 = st.columns(2)
-    
+
     with col1:
         st.markdown("##### 📅 처리 날짜")
         today = datetime.now()
@@ -93,7 +93,7 @@ def main():
                 - 기아: `재고리스트_기아_YYMMDD.xls` 파일
                 """
             )
-    
+
     st.markdown("---")
 
     # 메인 영역 - 파일 업로드
@@ -122,7 +122,7 @@ def main():
         if hyundai_file is None or kia_file is None:
             st.error("❌ 현대와 기아 재고 파일을 모두 업로드해주세요.")
             return
-        
+
         # 새로운 처리 시작 시 이전 결과 초기화
         st.session_state.processing_complete = False
         st.session_state.results_data = None
@@ -237,12 +237,11 @@ def main():
                         # 결과를 세션 상태에 저장
                         st.session_state.processing_complete = True
                         st.session_state.results_data = {
-                            'df_selected': df_selected,
-                            'df_all': df_all,
-                            'df_upload': df_upload,
-                            'date_str': date_str
+                            "df_selected": df_selected,
+                            "df_all": df_all,
+                            "df_upload": df_upload,
+                            "date_str": date_str,
                         }
-
 
                     finally:
                         # 원래 함수들 복원
@@ -258,10 +257,10 @@ def main():
     # 처리 완료된 결과가 있으면 표시
     if st.session_state.processing_complete and st.session_state.results_data:
         results = st.session_state.results_data
-        df_selected = results['df_selected']
-        df_all = results['df_all']
-        df_upload = results['df_upload']
-        date_str = results['date_str']
+        df_selected = results["df_selected"]
+        df_all = results["df_all"]
+        df_upload = results["df_upload"]
+        date_str = results["date_str"]
 
         # 결과 표시
         st.markdown("---")
@@ -290,15 +289,13 @@ def main():
         col1, col2, col3 = st.columns(3)
 
         with col1:
-            selected_excel = create_download_file(
-                df_selected, "selected", date_str
-            )
+            selected_excel = create_download_file(df_selected, "selected", date_str)
             st.download_button(
                 label="📋 선택된 차량 다운로드",
                 data=selected_excel,
                 file_name=f"stock_selected_{date_str}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key="download_selected"
+                key="download_selected",
             )
 
         with col2:
@@ -308,19 +305,17 @@ def main():
                 data=all_excel,
                 file_name=f"stock_all_{date_str}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key="download_all"
+                key="download_all",
             )
 
         with col3:
-            upload_excel = create_download_file(
-                df_upload, "upload", date_str
-            )
+            upload_excel = create_download_file(df_upload, "upload", date_str)
             st.download_button(
                 label="📋 업로드용 다운로드",
                 data=upload_excel,
                 file_name=f"stock_upload_{date_str}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key="download_upload"
+                key="download_upload",
             )
 
         # 결과 초기화 버튼
@@ -333,9 +328,7 @@ def main():
         st.markdown("---")
         st.subheader("👀 데이터 미리보기")
 
-        tab1, tab2, tab3 = st.tabs(
-            ["선택된 차량", "전체 차량", "업로드용"]
-        )
+        tab1, tab2, tab3 = st.tabs(["선택된 차량", "전체 차량", "업로드용"])
 
         with tab1:
             st.dataframe(df_selected.head(10), use_container_width=True)
