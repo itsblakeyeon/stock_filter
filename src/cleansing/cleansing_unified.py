@@ -6,23 +6,16 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from src.cleansing.cleansing_hyundai import clean_data as clean_hyundai_data
 from src.cleansing.cleansing_kia import clean_data as clean_kia_data
+from src.cleansing.common import reorder_cleansing_columns
 
 
 def apply_common_cleansing(df):
     """기본 클렌징 로직을 적용하는 함수"""
-    print("🔧 기본 클렌징 로직 적용 중...")
-    
-    # 기본 필드 초기화
-    df["price_total"] = ""
-    df["price_tax"] = ""
-    df["price_registration"] = ""
-    df["promotion"] = ""
-    df["subsidy_national"] = ""
-    df["subsidy_lease"] = ""
-    df["subsidy_tax"] = ""
-    df["price_car_tax_pre"] = ""
-    df["price_car_tax_post"] = ""
-    
+    print("🔧 최종 컬럼 순서 정렬 중...")
+
+    # 공통 함수 사용하여 컬럼 순서 정렬
+    df = reorder_cleansing_columns(df)
+
     print("✅ 기본 클렌징 로직 완료!")
     return df
 

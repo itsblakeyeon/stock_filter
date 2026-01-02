@@ -60,58 +60,14 @@ def clean_data():
             "가격",
         ]
     ]
-    df.columns = ["code_sales_a", "code_sales_b", "code_color_a", "code_color_b", "request", "stock", "model_raw", "options", "color_exterior", "color_interior", "price_car_original"]  # type: ignore
+    df.columns = ["code_sales_a", "code_sales_b", "code_color_a", "code_color_b", "request", "stock", "model_raw", "options", "color_exterior", "color_interior", "price"]  # type: ignore
 
     df["trim_raw"] = ""
 
     # 기본 필드들 초기화 (공통 함수 사용)
     df = initialize_base_columns(df, "기아")
 
-    # 추가 필드들
-    df["key_subsidy"] = ""
-    df["price_total"] = ""
-    df["price_tax"] = ""
-    df["price_registration"] = ""
-    df["subsidy_national"] = ""
-    df["subsidy_lease"] = ""
-    df["subsidy_tax"] = ""
-    df["promotion"] = ""
-    df["price_car_tax_pre"] = ""
-    df["price_car_tax_post"] = ""
-
     df = apply_cleansing_rules(df)
-
-    column_order = [
-        "code_sales_a",
-        "code_sales_b",
-        "code_color_a",
-        "code_color_b",
-        "request",
-        "stock",
-        "company",
-        "model_raw",
-        "trim_raw",
-        "key_subsidy",
-        "options",
-        "model",
-        "trim",
-        "year",
-        "fuel",
-        "wheel_tire",
-        "color_exterior",
-        "color_interior",
-        "price_total",
-        "price_car_original",
-        "price_car_tax_pre",
-        "price_car_tax_post",
-        "price_tax",
-        "price_registration",
-        "subsidy_national",
-        "subsidy_lease",
-        "subsidy_tax",
-        "promotion",
-    ]
-    df = df[column_order]
 
     print(f"✅ 기아차 전처리 완료! {len(df)}개 차량 데이터")
     print(f"📊 컬럼 구성: {len(df.columns)}개 필드")  # type: ignore
@@ -177,10 +133,6 @@ def apply_cleansing_rules(df):
         df.at[idx, "wheel_tire"] = wheel_tire
         df.at[idx, "options"] = cleaned_option
 
-        # key_subsidy 매핑
-        df.at[idx, "key_subsidy"] = extract_subsidy_trim(
-            raw_model, raw_trim, row["options"]
-        )
 
     return df
 

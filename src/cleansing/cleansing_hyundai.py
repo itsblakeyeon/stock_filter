@@ -26,37 +26,14 @@ def clean_data():
     
     # 컬럼 정리 - 새로운 현대 데이터 구조에 맞게 수정
     df = df[["판매코드", "Unnamed: 2", "칼라코드", "Unnamed: 4", "요청", "재고", "차종", "옵션", "외/내장칼라", "Unnamed: 10", "가격", "시트명"]]
-    df.columns = ["code_sales_a", "code_sales_b", "code_color_a", "code_color_b", "request", "stock", "trim_raw", "options", "color_exterior", "color_interior", "price_car_original", "model_raw"]  # type: ignore
-    
+    df.columns = ["code_sales_a", "code_sales_b", "code_color_a", "code_color_b", "request", "stock", "trim_raw", "options", "color_exterior", "color_interior", "price", "model_raw"]  # type: ignore
+
     # 기본 필드들 초기화 (공통 함수 사용)
     df = initialize_base_columns(df, "현대")
     
-    # 추가 필드들
-    df["key_subsidy"] = ""
-    df["price_total"] = ""
-    df["price_tax"] = ""
-    df["price_registration"] = ""
-    df["subsidy_national"] = ""
-    df["subsidy_lease"] = ""
-    df["subsidy_tax"] = ""
-    df["promotion"] = ""
-    df["price_car_tax_pre"] = ""
-    df["price_car_tax_post"] = ""
-    
     # 클렌징 규칙 적용
     df = apply_cleansing_rules(df)
-    
-    # 시트명 컬럼 제거 (Raw_모델로 사용됨)
-    # df = df.drop(columns=["시트명"])  # 시트명은 이미 Raw_모델로 사용됨
-    
-    # 컬럼 순서 재정렬
-    column_order = [
-        "code_sales_a", "code_sales_b", "code_color_a", "code_color_b", 
-        "request", "stock", "company", "model_raw", "trim_raw", "key_subsidy", "options", "model", "trim", 
-        "year", "fuel", "wheel_tire", "color_exterior", "color_interior", "price_total", "price_car_original", "price_car_tax_pre", "price_car_tax_post", "price_tax", "price_registration", "subsidy_national", "subsidy_lease", "subsidy_tax", "promotion"
-    ]
-    df = df[column_order]
-    
+
     print(f"✅ 현대차 전처리 완료! {len(df)}개 차량 데이터")
     print(f"📊 컬럼 구성: {len(df.columns)}개 필드")  # type: ignore
     return df
@@ -96,10 +73,6 @@ def apply_cleansing_rules(df):
         wheel_tire, cleaned_option = extract_wheel_tire_from_both(raw_trim, option_value)
         df.at[idx, "wheel_tire"] = wheel_tire
         df.at[idx, "options"] = cleaned_option
-        
-        # 보조금 트림 매칭
-        df.at[idx, "key_subsidy"] = match_subsidy_trim(df.at[idx, "fuel"], df.at[idx, "model"], raw_trim)
-        
 
     
     return df

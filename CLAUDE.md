@@ -1,7 +1,7 @@
 # Claude Assistant Instructions
 
 ## Project Overview
-Stock management and price analysis project for Hyundai and Kia vehicles.
+Stock filtering project for Hyundai and Kia vehicles - simple 2-stage pipeline.
 
 ## Key Commands
 한글로 대화하자.
@@ -30,35 +30,29 @@ python -m src.cleansing.cleansing_unified
 
 # Listing
 python -m src.listing.listing_unified
-
-# Pricing
-python -m src.pricing.pricing_unified
-
-# Export
-python -m src.utils.export_cleansing_results
-```
-
-### Testing
-```bash
-# No specific test commands defined yet
-```
-
-### Linting/Type Checking
-```bash
-# No specific lint/typecheck commands defined yet
 ```
 
 ## Project Structure
-- `src/cleansing/` - Data cleansing modules
-- `src/pricing/` - Price calculation modules  
-- `src/listing/` - Listing generation modules
-- `src/image/` - Image management modules
-- `src/utils/` - Utility functions
-- `data/raw/` - Raw input data
-- `data/reference/` - Reference data
-- `data/export/` - Output files
+- `src/cleansing/` - Data cleansing modules (Hyundai, Kia, unified)
+- `src/listing/` - Listing filtering module
+- `src/config/` - Configuration and constants
+- `data/raw/` - Raw input data (날짜별: YYMMDD 형식)
+- `results/` - Output files
+
+## Pipeline
+1. **Cleansing**: Clean and merge Hyundai + Kia inventory data
+2. **Listing**: Filter vehicles by criteria (wheel/tire, options, seating)
+3. **Output**: Generate `stock_filtered_YYMMDD.xlsx` in `results/` folder
+
+## Filtering Criteria
+- 기본 휠&타이어만 (제네시스 18인치 포함)
+- 빌트인캠 또는 무옵션만
+- 싼타페 하이브리드: 5인승만
+- 팰리세이드: 9인승만
 
 ## Important Notes
 - Virtual environment (`venv/`) is excluded from Git
-- Data files in `data/raw/` need to be managed separately
-- All results are saved to `data/export/` folder
+- Data files in `data/raw/` are managed per date (YYMMDD format)
+- All results are saved to `results/` folder
+- No pricing, subscription, or image features - pure filtering only
+- Minimal dependencies: pandas, openpyxl, xlrd, requests
